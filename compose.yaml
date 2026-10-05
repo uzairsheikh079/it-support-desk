@@ -1,0 +1,86 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: "${APP_KEY:-base64:Arx6wkqAjtNG8HL22wrV3OkzJNBNgaQsWYsz9PeSGL4=}"
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: supportdesk
+      DB_USERNAME: supportdesk
+      DB_PASSWORD: supportdesk
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: supportdesk
+      RABBITMQ_PASSWORD: supportdesk
+      RABBITMQ_QUEUE: support
+      SUPPORTDESK_API_KEY: "${SUPPORTDESK_API_KEY:-local-development-api-key}"
+      SUPPORTDESK_DEMO_EMAIL: admin@example.com
+      SUPPORTDESK_DEMO_PASSWORD: password
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: php artisan queue:work rabbitmq --queue=support --tries=3 --timeout=60
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: "${APP_KEY:-base64:Arx6wkqAjtNG8HL22wrV3OkzJNBNgaQsWYsz9PeSGL4=}"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: supportdesk
+      DB_USERNAME: supportdesk
+      DB_PASSWORD: supportdesk
+      QUEUE_CONNECTION: rabbitmq
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: supportdesk
+      RABBITMQ_PASSWORD: supportdesk
+      RABBITMQ_QUEUE: support
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: supportdesk
+      MYSQL_USER: supportdesk
+      MYSQL_PASSWORD: supportdesk
+      MYSQL_ROOT_PASSWORD: local-root-password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-plocal-root-password"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports:
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: supportdesk
+      RABBITMQ_DEFAULT_PASS: supportdesk
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-data:
